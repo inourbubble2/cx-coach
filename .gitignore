@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+*.log
+.errors
+
+# Validation & Linting
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project Specific
+uv.lock
+# (uv.lock is typically committed for apps, but strict interpretation might vary. 
+# However, for reproducible builds it is RECOMMENDED to commit it.
+# If you want to ignore it, uncomment the line above. 
+# I will leave it commented out by default as per best practices for apps)
+!uv.lock
+env.yaml

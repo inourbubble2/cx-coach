@@ -1,0 +1,69 @@
+# cx-coach Docker Compose
+# Local development stack: API + UI + PostgreSQL (pgvector)
+
+services:
+  # PostgreSQL with pgvector extension
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: cx-coach-db
+    environment:
+      POSTGRES_USER: cx_coach
+      POSTGRES_PASSWORD: cx_coach_dev
+      POSTGRES_DB: cx_coach
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U cx_coach -d cx_coach" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cx-coach-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://cx_coach:cx_coach_dev@db:5432/cx_coach}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_KEY=${SUPABASE_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: cx-coach-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  pgdata:
+    driver: local

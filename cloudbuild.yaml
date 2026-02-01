@@ -1,0 +1,79 @@
+# GCP Cloud Build + Cloud Run 배포
+# gcloud builds submit --config cloudbuild.yaml
+
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cx-coach-api:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cx-coach-api:latest'
+      - '.'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/cx-coach-api:$SHORT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/cx-coach-api:latest'
+
+  # Deploy API & UI to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # 1. Deploy API
+        echo "Deploying API Service..."
+        gcloud run deploy cx-coach-api \
+          --image gcr.io/$PROJECT_ID/cx-coach-api:$_TAG \
+          --region asia-northeast3 \
+          --platform managed \
+          --allow-unauthenticated \
+          --port 8000 \
+          --memory 512Mi \
+          --set-env-vars "OPENAI_API_KEY=$_OPENAI_API_KEY" \
+          --set-env-vars "DATABASE_URL=$_DATABASE_URL" \
+          --set-env-vars "SUPABASE_URL=$_SUPABASE_URL" \
+          --set-env-vars "SUPABASE_KEY=$_SUPABASE_KEY"
+
+        # 2. Get API URL
+        echo "Fetching API URL..."
+        API_URL=$(gcloud run services describe cx-coach-api --region asia-northeast3 --format 'value(status.url)')
+        echo "API_URL detected: $API_URL"
+
+        # 3. Deploy UI (connected to API)
+        echo "Deploying UI Service..."
+        gcloud run deploy cx-coach-ui \
+          --image gcr.io/$PROJECT_ID/cx-coach-api:$_TAG \
+          --region asia-northeast3 \
+          --platform managed \
+          --allow-unauthenticated \
+          --port 8501 \
+          --memory 512Mi \
+          --set-env-vars "API_URL=$API_URL" \
+          --set-env-vars "OPENAI_API_KEY=$_OPENAI_API_KEY" \
+          --set-env-vars "DATABASE_URL=$_DATABASE_URL" \
+          --set-env-vars "SUPABASE_URL=$_SUPABASE_URL" \
+          --set-env-vars "SUPABASE_KEY=$_SUPABASE_KEY" \
+          --command "uv" \
+          --args "run,streamlit,run,app/interfaces/ui/main.py,--server.address,0.0.0.0,--server.port,8501,--server.headless,true"
+
+substitutions:
+  _OPENAI_API_KEY: ""
+  _DATABASE_URL: ""
+  _SUPABASE_URL: ""
+  _SUPABASE_KEY: ""
+  _TAG: "latest"
+
+images:
+  - 'gcr.io/$PROJECT_ID/cx-coach-api:$_TAG'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

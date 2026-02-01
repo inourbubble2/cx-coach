@@ -1,0 +1,21 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(pytest:*)",
+            "Bash(ruff:*)",
+            "Bash(uv:*)",
+            "Bash(pip:*)",
+            "Read(**)",
+            "Write(app/**)",
+            "Write(tests/**)"
+        ],
+        "deny": [
+            "Bash(rm -rf:*)",
+            "Write(.env)"
+        ]
+    },
+    "env": {
+        "PYTHONPATH": ".",
+        "ENV": "development"
+    }
+}
